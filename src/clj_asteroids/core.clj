@@ -48,6 +48,18 @@
       (assoc :max-speed 10)
       (assoc :ttl 3000)))
 
+(defn new-asteroid [radius]
+  { :radius radius
+    :x (rand-int 600) :y (rand-int 500) :angle (* (rand) Math/PI 2)
+    :vx (- (* 6 (rand)) 3) :vy (- (* 6 (rand)) 3) :va (* (- (rand) 0.5) 0.1)
+    :max-speed 4
+    :points (for [angle (range 10)]
+              (let [angle (+ angle (* (rand) -0.5) 0.1)
+                    radians (* Math/PI 2 (/ angle 10.0))
+                    r (+ radius (rand-int 10))
+                    px (* r (Math/cos radians))
+                    py (* r (Math/sin radians))]
+                [px py]))})
 
 ;; time
 (def previous-time-atom (atom 0))
@@ -57,12 +69,16 @@
 
 
 ;; state
-(def game-atom (atom { :player (new-player) }))
-
 (def next-id-atom (atom 0))
 
 (defn next-id []
   (swap! next-id-atom inc))
+
+(def game-atom (atom (-> {}
+                         (assoc :player (new-player))
+                         (assoc (next-id) (new-asteroid 32))
+                         (assoc (next-id) (new-asteroid 22))
+                         (assoc (next-id) (new-asteroid 12)))))
 
 
 ;; updates
@@ -81,10 +97,16 @@
           (update-in [:vx] #(* max-speed (/ % v)))
           (update-in [:vy] #(* max-speed (/ % v)))))))
 
+(defn apply-thrust [entity]
+  (if (:thrust entity)
+    (-> entity
+        (update-in [:vx] #(+ % (* (:thrust entity) (Math/cos (:angle entity)))))
+        (update-in [:vy] #(+ % (* (:thrust entity) (Math/sin (:angle entity))))))
+    entity))
+
 (defn update-entity [entity]
   (-> entity
-      (update-in [:vx] #(+ % (* (:thrust entity) (Math/cos (:angle entity)))))
-      (update-in [:vy] #(+ % (* (:thrust entity) (Math/sin (:angle entity)))))
+      (apply-thrust)
       (clamp-speed)
       (update-in [:x] #(wrap-around (+ % (:vx entity)) 0 (width)))
       (update-in [:y] #(wrap-around (+ % (:vy entity)) 0 (height)))
@@ -118,6 +140,29 @@
            nil))
 
 
+(defn draw-asteroid [obj]
+  (stroke-weight 0)
+  (with-fill [200]
+    (with-stroke [0]
+      (with-translation [(:x obj) (:y obj)]
+        (with-rotation [(:angle obj)]
+          (begin-shape :triangle-fan)
+          (vertex 0 0)
+          (doseq [[x y] (:points obj)]
+              (vertex x y))
+          (let [[x y] (first (:points obj))]
+              (vertex x y))
+          (end-shape))))))
+
+(defn draw-entity [obj]
+  (if (:image obj)
+    (with-translation [(:x obj) (:y obj)]
+      (with-rotation [(:angle obj)]
+        (with-translation [(- (/ (:w obj) 2)) (- (/ (:h obj) 2))]
+          (image (get-image (:image obj)) 0 0 (:w obj) (:h obj)))))
+    (draw-asteroid obj)))
+
+
 ;; quil
 (defn setup []
   (preload-image "player.png")
@@ -130,10 +175,7 @@
   (background 8 8 32)
   (swap! game-atom update-game)
   (doseq [[k obj] @game-atom]
-    (with-translation [(:x obj) (:y obj)]
-      (with-rotation [(:angle obj)]
-        (with-translation [(- (/ (:w obj) 2)) (- (/ (:h obj) 2))]
-          (image (get-image (:image obj)) 0 0 (:w obj) (:h obj))))))
+    (draw-entity obj))
   (reset! previous-time-atom (millis)))
 
 
