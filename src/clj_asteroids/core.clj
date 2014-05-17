@@ -1,7 +1,19 @@
 (ns clj-asteroids.core
-  (:gen-class))
+  (:gen-class)
+  (:require [quil.core :refer :all]))
 
-(defn -main
-  "I don't do a whole lot ... yet."
-  [& args]
-  (println "Hello, World!"))
+
+(defn setup []
+  (smooth)
+  (frame-rate 30)
+  (background 8 8 32))
+
+(defn draw []
+  (background 8 8 32))
+
+(defn -main [& args]
+  (defsketch example
+    :title "Asteroids"
+    :setup setup
+    :draw draw
+    :size [600 500]))
