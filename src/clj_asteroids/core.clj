@@ -28,7 +28,8 @@
 
 ;; constructors
 (defn new-player []
-  { :image "player.png"
+  { :entity-type :ship
+    :image "player.png"
     :radius 32
     :x 200 :y 100 :angle (/ Math/PI 4)
     :vx 0.0 :vy 0.0 :va 0.0 :thrust 0
@@ -36,6 +37,7 @@
 
 (defn new-bullet [source]
   (-> source
+      (assoc :entity-type :bullet)
       (update-in [:x] #(+ % (* (:radius source) 0.6 (Math/cos (:angle source)))))
       (update-in [:y] #(+ % (* (:radius source) 0.6 (Math/sin (:angle source)))))
       (assoc :vx (+ (:vx source) (* 8 (Math/cos (:angle source)))))
@@ -48,7 +50,8 @@
       (assoc :ttl 3000)))
 
 (defn new-asteroid [radius]
-  { :radius radius
+  { :entity-type :asteroid
+    :radius radius
     :x (rand-int 600) :y (rand-int 500) :angle (* (rand) Math/PI 2)
     :vx (- (* 6 (rand)) 3) :vy (- (* 6 (rand)) 3) :va (* (- (rand) 0.5) 0.1)
     :max-speed 4
@@ -80,21 +83,42 @@
                          (assoc (next-id) (new-asteroid 12)))))
 
 
+
+;; collision detection and collision update
+(defn collides? [a b]
+  (let [dx (- (:x a) (:x b))
+        dy (- (:y a) (:y b))
+        r (+ (:radius a) (:radius b))]
+    (> (* r r) (+ (* dx dx) (* dy dy)))))
+
+(defmulti collide
+  (fn [a b] [(:entity-type a) (:entity-type b)]))
+
+(defmethod collide [:asteroid :bullet] [a b]
+    (assoc a :ttl -1))
+
+(defmethod collide :default [a b]
+  a)
+
+(defn do-collisions-on [e game]
+  (let [[_ other] (first game)
+        remaining (rest game)]
+    (cond
+     (empty? remaining)         e
+     (and (not (= e other))
+          (collides? e other))  (recur (collide e other) remaining)
+     :else                      (recur e remaining))))
+
+(defn do-collisions [game]
+  (map-values #(do-collisions-on % game) game))
+
+
 ;; updates
 (defn wrap-around [v min max]
   (cond
    (< v min)  (+ v max)
    (> v max)  (- v max)
    :else      v))
-
-(defn clamp-speed [e]
-  (let [max-speed (:max-speed e)
-        v (Math/sqrt (+ (* (:vx e) (:vx e)) (* (:vy e) (:vy e))))]
-    (if (< v max-speed)
-      e
-      (-> e
-          (update-in [:vx] #(* max-speed (/ % v)))
-          (update-in [:vy] #(* max-speed (/ % v)))))))
 
 (defn apply-thrust [e]
   (if (:thrust e)
@@ -103,17 +127,31 @@
         (update-in [:vy] #(+ % (* (:thrust e) (Math/sin (:angle e))))))
     e))
 
+(defn clamp-velocity [e]
+  (let [max-speed (:max-speed e)
+        v (Math/sqrt (+ (* (:vx e) (:vx e)) (* (:vy e) (:vy e))))]
+    (if (< v max-speed)
+      e
+      (-> e
+          (update-in [:vx] #(* max-speed (/ % v)))
+          (update-in [:vy] #(* max-speed (/ % v)))))))
+
+(defn apply-velocity [e]
+  (-> e
+     (update-in [:x] #(wrap-around (+ % (:vx e)) 0 (width)))
+     (update-in [:y] #(wrap-around (+ % (:vy e)) 0 (height)))
+     (update-in [:angle] #(+ % (:va e)))))
+
 (defn update-entity [e]
   (-> e
       (apply-thrust)
-      (clamp-speed)
-      (update-in [:x] #(wrap-around (+ % (:vx e)) 0 (width)))
-      (update-in [:y] #(wrap-around (+ % (:vy e)) 0 (height)))
-      (update-in [:angle] #(+ % (:va e)))
+      (clamp-velocity)
+      (apply-velocity)
       (safe-update-in [:ttl] #(- % (elapsed-time)))))
 
 (defn update-game [game]
   (->> game
+       (do-collisions)
        (map-values update-entity)
        (filter-values #(or (nil? (:ttl %)) (< 0 (:ttl %))))))
 
@@ -139,8 +177,8 @@
            nil))
 
 
+;; drawing
 (defn draw-asteroid-at [e x y]
-  (stroke-weight 0)
   (with-fill [200]
     (with-stroke [0]
       (with-translation [x y]
@@ -162,8 +200,8 @@
 (defn draw-with [f e]
   (let [r (:radius e)]
     (f e (:x e) (:y e))
-    (when (< (- (:x e) r)   0)     (f e (+ (:x e) 600) (:y e)))
-    (when (> (+ (:x e) r) 600)     (f e (- (:x e) 600) (:y e)))
+    (when (< (- (:x e) r)   0)     (f e (+ (:x e) 600)    (:y e)))
+    (when (> (+ (:x e) r) 600)     (f e (- (:x e) 600)    (:y e)))
     (when (< (- (:y e) r)   0)     (f e    (:x e)      (+ (:y e) 500)))
     (when (> (+ (:y e) r) 500)     (f e    (:x e)      (- (:y e) 500)))))
 
@@ -178,14 +216,15 @@
   (preload-image "player.png")
   (preload-image "bullet.png")
   (smooth)
+  (stroke-weight 0)
   (frame-rate 30)
   (background 8 8 32))
 
 (defn draw []
   (background 8 8 32)
-  (swap! game-atom update-game)
   (doseq [[k e] @game-atom]
     (draw-entity e))
+  (swap! game-atom update-game)
   (reset! previous-time-atom (millis)))
 
 
