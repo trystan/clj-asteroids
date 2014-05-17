@@ -29,6 +29,7 @@
 ;; constructors
 (defn new-player []
   { :entity-type :ship
+    :health 100
     :children (list)
     :image "player.png"
     :radius 32
@@ -61,13 +62,13 @@
     :points (for [angle (range 10)]
               (let [angle (+ angle (* (rand) -0.5) 0.1)
                     radians (* Math/PI 2 (/ angle 10.0))
-                    r (+ radius (rand-int 10))
+                    r (+ radius (rand-int 10) 5)
                     px (* r (Math/cos radians))
                     py (* r (Math/sin radians))]
                 [px py]))})
 
 (defn new-asteroid-from [a]
-  (-> (new-asteroid (* (:radius a) 0.75))
+  (-> (new-asteroid (* (:radius a) 0.66))
       (assoc :x (+ (:x a) (rand-int 10) -5))
       (assoc :y (+ (:y a) (rand-int 10) -5))
       (assoc :vx (* 1.15 (+ (:vx a) (- (rand-int 6) 3))))
@@ -106,7 +107,7 @@
   (fn [a b] [(:entity-type a) (:entity-type b)]))
 
 (defmethod collide [:asteroid :bullet] [a b]
-  (if (> 10 (:radius a))
+  (if (> 5 (:radius a))
     (assoc a :ttl -1)
     (-> a
         (assoc :ttl -1)
@@ -114,7 +115,13 @@
         (update-in [:children] #(conj % (new-asteroid-from a))))))
 
 (defmethod collide [:bullet :asteroid] [a b]
-    (assoc a :ttl -1))
+  (assoc a :ttl -1))
+
+(defmethod collide [:ship :asteroid] [a b]
+  (-> a
+      (update-in [:vx] #(+ % (* 0.05 (- (:x a) (:x b)))))
+      (update-in [:vy] #(+ % (* 0.05 (- (:y a) (:y b)))))
+      (update-in [:health] #(- % (* (:radius b) 0.1)))))
 
 (defmethod collide :default [a b]
   a)
@@ -192,7 +199,7 @@
     :up    (swap! game-atom (fn [game] (assoc-in  game [:player :thrust] 0.2)))
     :fire  (swap! game-atom (fn [game] (update-in game [:player :children] #(conj % (new-bullet (:player game))))))
     :p     (println @game-atom)
-           (println "Unexpected key press" (key-as-keyword))))
+           nil))
 
 (defn key-released []
   (case (translate-key (key-as-keyword))
@@ -249,6 +256,7 @@
   (background 8 8 32)
   (doseq [[k e] @game-atom]
     (draw-entity e))
+  (text (str (Math/floor (:health (:player @game-atom))) "% health") 20 20)
   (swap! game-atom update-game)
   (reset! previous-time-atom (millis)))
 
