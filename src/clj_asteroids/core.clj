@@ -3,7 +3,7 @@
   (:require [quil.core :refer :all]))
 
 
-(def preloaded-images-atom (atom {}))
+(defonce preloaded-images-atom (atom {}))
 
 (defn preload-image [path]
   (swap! preloaded-images-atom #(assoc % path (load-image path))))
@@ -12,7 +12,10 @@
   (get @preloaded-images-atom path))
 
 
-(def game-atom (atom { :player { :x 200 :y 100 :image "player.png" }}))
+
+(def game-atom (atom { :player { :x 200 :y 100
+                                 :image "player.png"
+                                 :angle (/ Math/PI 4) }}))
 
 
 
@@ -25,7 +28,9 @@
 (defn draw []
   (background 8 8 32)
   (doseq [[k obj] @game-atom]
-    (image (get-image (:image obj)) (:x obj) (:y obj) 32 32)))
+    (with-translation [(:x obj) (:y obj)]
+      (with-rotation [(:angle obj)]
+        (image (get-image (:image obj)) 0 0 32 32)))))
 
 (defn -main [& args]
   (defsketch example
