@@ -29,6 +29,7 @@
 ;; constructors
 (defn new-player []
   { :entity-type :ship
+    :children (list)
     :image "player.png"
     :radius 32
     :x 200 :y 100 :angle (/ Math/PI 4)
@@ -38,6 +39,7 @@
 (defn new-bullet [source]
   (-> source
       (assoc :entity-type :bullet)
+      (assoc :children (list))
       (update-in [:x] #(+ % (* (:radius source) 0.6 (Math/cos (:angle source)))))
       (update-in [:y] #(+ % (* (:radius source) 0.6 (Math/sin (:angle source)))))
       (assoc :vx (+ (:vx source) (* 8 (Math/cos (:angle source)))))
@@ -51,6 +53,7 @@
 
 (defn new-asteroid [radius]
   { :entity-type :asteroid
+    :children (list)
     :radius radius
     :x (rand-int 600) :y (rand-int 500) :angle (* (rand) Math/PI 2)
     :vx (- (* 6 (rand)) 3) :vy (- (* 6 (rand)) 3) :va (* (- (rand) 0.5) 0.1)
@@ -62,6 +65,14 @@
                     px (* r (Math/cos radians))
                     py (* r (Math/sin radians))]
                 [px py]))})
+
+(defn new-asteroid-from [a]
+  (-> (new-asteroid (* (:radius a) 0.75))
+      (assoc :x (+ (:x a) (rand-int 10) -5))
+      (assoc :y (+ (:y a) (rand-int 10) -5))
+      (assoc :vx (* 1.15 (+ (:vx a) (- (rand-int 6) 3))))
+      (assoc :vy (* 1.15 (+ (:vy a) (- (rand-int 6) 3))))
+      (assoc :va (+ (:va a) (* (- (rand) 0.5) 0.05)))))
 
 ;; time
 (def previous-time-atom (atom 0))
@@ -95,6 +106,14 @@
   (fn [a b] [(:entity-type a) (:entity-type b)]))
 
 (defmethod collide [:asteroid :bullet] [a b]
+  (if (> 10 (:radius a))
+    (assoc a :ttl -1)
+    (-> a
+        (assoc :ttl -1)
+        (update-in [:children] #(conj % (new-asteroid-from a)))
+        (update-in [:children] #(conj % (new-asteroid-from a))))))
+
+(defmethod collide [:bullet :asteroid] [a b]
     (assoc a :ttl -1))
 
 (defmethod collide :default [a b]
@@ -149,31 +168,37 @@
       (apply-velocity)
       (safe-update-in [:ttl] #(- % (elapsed-time)))))
 
+(defn add-children [game]
+  (let [children (mapcat #(:children (val %)) game)
+        game2 (map-values #(assoc % :children (list)) game)]
+    (into game2 (map #(identity [(next-id) %]) children))))
+
 (defn update-game [game]
   (->> game
        (do-collisions)
        (map-values update-entity)
+       (add-children)
        (filter-values #(or (nil? (:ttl %)) (< 0 (:ttl %))))))
 
 
 ;; user input
 (defn translate-key [k]
-  (get { :a :left :d :right :w :up :l :fire } k k))
+  (get { :a :left :d :right :w :up :l :fire :f :fire } k k))
 
 (defn key-pressed []
   (case (translate-key (key-as-keyword))
-    :left  (swap! game-atom (fn [game] (update-in game [:player :va] #(- % 0.1))))
-    :right (swap! game-atom (fn [game] (update-in game [:player :va] #(+ % 0.1))))
+    :left  (swap! game-atom (fn [game] (assoc-in  game [:player :va] -0.1)))
+    :right (swap! game-atom (fn [game] (assoc-in  game [:player :va]  0.1)))
     :up    (swap! game-atom (fn [game] (assoc-in  game [:player :thrust] 0.2)))
-    :fire  (swap! game-atom (fn [game] (assoc     game (next-id) (new-bullet (:player game)))))
+    :fire  (swap! game-atom (fn [game] (update-in game [:player :children] #(conj % (new-bullet (:player game))))))
     :p     (println @game-atom)
            (println "Unexpected key press" (key-as-keyword))))
 
 (defn key-released []
   (case (translate-key (key-as-keyword))
-    :left  (swap! game-atom (fn [game] (update-in game [:player :va] #(+ % 0.1))))
-    :right (swap! game-atom (fn [game] (update-in game [:player :va] #(- % 0.1))))
-    :up    (swap! game-atom (fn [game] (assoc-in  game [:player :thrust] 0)))
+    :left  (swap! game-atom (fn [game] (assoc-in game [:player :va] 0)))
+    :right (swap! game-atom (fn [game] (assoc-in game [:player :va] 0)))
+    :up    (swap! game-atom (fn [game] (assoc-in game [:player :thrust] 0)))
            nil))
 
 
