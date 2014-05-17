@@ -9,7 +9,8 @@
   (background 8 8 32))
 
 (defn draw []
-  (background 8 8 32))
+  (background 8 8 32)
+  (image (load-image "player.png") 100 100 32 32))
 
 (defn -main [& args]
   (defsketch example
