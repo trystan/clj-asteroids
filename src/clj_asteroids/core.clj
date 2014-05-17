@@ -53,19 +53,22 @@
         (with-translation [(- (/ (:w obj) 2)) (- (/ (:h obj) 2))]
           (image (get-image (:image obj)) 0 0 (:w obj) (:h obj)))))))
 
+(defn translate-key [k]
+  (get { :a :left :d :right :w :up } k k))
+
 (defn key-pressed []
-  (case (key-as-keyword)
-    :a   (swap! game-atom (fn [game] (update-in game [:player :va] #(- % 0.1))))
-    :d   (swap! game-atom (fn [game] (update-in game [:player :va] #(+ % 0.1))))
-    :w   (swap! game-atom (fn [game] (update-in game [:player :thrust] #(+ % 0.1))))
-         (println "Unexpected key press" (key-as-keyword))))
+  (case (translate-key (key-as-keyword))
+    :left  (swap! game-atom (fn [game] (update-in game [:player :va] #(- % 0.1))))
+    :right (swap! game-atom (fn [game] (update-in game [:player :va] #(+ % 0.1))))
+    :up    (swap! game-atom (fn [game] (update-in game [:player :thrust] #(+ % 0.1))))
+           (println "Unexpected key press" (key-as-keyword))))
 
 (defn key-released []
-  (case (key-as-keyword)
-    :a   (swap! game-atom (fn [game] (update-in game [:player :va] #(+ % 0.1))))
-    :d   (swap! game-atom (fn [game] (update-in game [:player :va] #(- % 0.1))))
-    :w   (swap! game-atom (fn [game] (update-in game [:player :thrust] #(- % 0.1))))
-         (println "Unexpected key release" (key-as-keyword))))
+  (case (translate-key (key-as-keyword))
+    :left  (swap! game-atom (fn [game] (update-in game [:player :va] #(+ % 0.1))))
+    :right (swap! game-atom (fn [game] (update-in game [:player :va] #(- % 0.1))))
+    :up    (swap! game-atom (fn [game] (update-in game [:player :thrust] #(- % 0.1))))
+           (println "Unexpected key release" (key-as-keyword))))
 
 
 (defn -main [& args]
