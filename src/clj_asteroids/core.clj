@@ -2,8 +2,10 @@
   (:gen-class)
   (:require [quil.core :refer :all]))
 
+(def WIDTH 1024)
+(def HEIGHT 768)
 
-;; helper functions
+;; utility functions
 (defn map-values [f m]
   (into {} (for [[k v] m] [k (f v)])))
 
@@ -16,7 +18,7 @@
     m))
 
 
-;; images
+;; image cahce
 (defonce preloaded-images-atom (atom {}))
 
 (defn preload-image [path]
@@ -26,7 +28,7 @@
   (get @preloaded-images-atom path))
 
 
-;; constructors
+;; entity constructors
 (defn new-player []
   { :entity-type :ship
     :health 100
@@ -35,7 +37,7 @@
     :radius 32
     :x 200 :y 100 :angle (/ Math/PI 4)
     :vx 0.0 :vy 0.0 :va 0.0 :thrust 0
-    :max-speed 5 })
+    :max-speed 3 })
 
 (defn new-bullet [source]
   (-> source
@@ -49,16 +51,18 @@
       (assoc :thrust 0)
       (assoc :image "bullet.png")
       (assoc :radius 8)
-      (assoc :max-speed 10)
+      (assoc :max-speed 5)
       (assoc :ttl 3000)))
+
+(open-window)
 
 (defn new-asteroid [radius]
   { :entity-type :asteroid
     :children (list)
     :radius radius
-    :x (rand-int 600) :y (rand-int 500) :angle (* (rand) Math/PI 2)
+    :x (rand-int WIDTH) :y (rand-int HEIGHT) :angle (* (rand) Math/PI 2)
     :vx (- (* 6 (rand)) 3) :vy (- (* 6 (rand)) 3) :va (* (- (rand) 0.5) 0.1)
-    :max-speed 4
+    :max-speed 3.5
     :points (for [angle (range 10)]
               (let [angle (+ angle (* (rand) -0.5) 0.1)
                     radians (* Math/PI 2 (/ angle 10.0))
@@ -75,14 +79,13 @@
       (assoc :vy (* 1.15 (+ (:vy a) (- (rand-int 6) 3))))
       (assoc :va (+ (:va a) (* (- (rand) 0.5) 0.05)))))
 
-;; time
+
+;; global state
 (def previous-time-atom (atom 0))
 
 (defn elapsed-time []
   (- (millis) @previous-time-atom))
 
-
-;; state
 (def next-id-atom (atom 0))
 
 (defn next-id []
@@ -93,7 +96,6 @@
                          (assoc (next-id) (new-asteroid 32))
                          (assoc (next-id) (new-asteroid 22))
                          (assoc (next-id) (new-asteroid 12)))))
-
 
 
 ;; collision detection and collision update
@@ -119,8 +121,8 @@
 
 (defmethod collide [:ship :asteroid] [a b]
   (-> a
-      (update-in [:vx] #(+ % (* 0.05 (- (:x a) (:x b)))))
-      (update-in [:vy] #(+ % (* 0.05 (- (:y a) (:y b)))))
+      (update-in [:vx] #(+ % (* 0.025 (- (:x a) (:x b)))))
+      (update-in [:vy] #(+ % (* 0.025 (- (:y a) (:y b)))))
       (update-in [:health] #(- % (* (:radius b) 0.1)))))
 
 (defmethod collide :default [a b]
@@ -139,7 +141,7 @@
   (map-values #(do-collisions-on % game) game))
 
 
-;; updates
+;; entity update functions
 (defn wrap-around [v min max]
   (cond
    (< v min)  (+ v max)
@@ -164,28 +166,34 @@
 
 (defn apply-velocity [e]
   (-> e
-     (update-in [:x] #(wrap-around (+ % (:vx e)) 0 (width)))
-     (update-in [:y] #(wrap-around (+ % (:vy e)) 0 (height)))
+     (update-in [:x] #(wrap-around (+ % (:vx e)) 0 WIDTH))
+     (update-in [:y] #(wrap-around (+ % (:vy e)) 0 HEIGHT))
      (update-in [:angle] #(+ % (:va e)))))
+
+(defn apply-ttl [e]
+  (safe-update-in e [:ttl] #(- % (elapsed-time))))
 
 (defn update-entity [e]
   (-> e
       (apply-thrust)
       (clamp-velocity)
       (apply-velocity)
-      (safe-update-in [:ttl] #(- % (elapsed-time)))))
+      (apply-ttl)))
 
 (defn add-children [game]
   (let [children (mapcat #(:children (val %)) game)
         game2 (map-values #(assoc % :children (list)) game)]
     (into game2 (map #(identity [(next-id) %]) children))))
 
+(defn is-alive? [e]
+  (or (nil? (:ttl e)) (< 0 (:ttl e))))
+
 (defn update-game [game]
   (->> game
        (do-collisions)
        (map-values update-entity)
        (add-children)
-       (filter-values #(or (nil? (:ttl %)) (< 0 (:ttl %))))))
+       (filter-values is-alive?)))
 
 
 ;; user input
@@ -194,9 +202,9 @@
 
 (defn key-pressed []
   (case (translate-key (key-as-keyword))
-    :left  (swap! game-atom (fn [game] (assoc-in  game [:player :va] -0.1)))
-    :right (swap! game-atom (fn [game] (assoc-in  game [:player :va]  0.1)))
-    :up    (swap! game-atom (fn [game] (assoc-in  game [:player :thrust] 0.2)))
+    :left  (swap! game-atom (fn [game] (assoc-in  game [:player :va] -0.05)))
+    :right (swap! game-atom (fn [game] (assoc-in  game [:player :va]  0.05)))
+    :up    (swap! game-atom (fn [game] (assoc-in  game [:player :thrust] 0.1)))
     :fire  (swap! game-atom (fn [game] (update-in game [:player :children] #(conj % (new-bullet (:player game))))))
     :p     (println @game-atom)
            nil))
@@ -211,7 +219,7 @@
 
 ;; drawing
 (defn draw-asteroid-at [e x y]
-  (with-fill [200]
+  (with-fill [200 150 140]
     (with-stroke [0]
       (with-translation [x y]
         (with-rotation [(:angle e)]
@@ -229,18 +237,24 @@
         (with-translation [(- (/ (:radius e) 2)) (- (/ (:radius e) 2))]
           (image (get-image (:image e)) 0 0 (:radius e) (:radius e))))))
 
-(defn draw-with [f e]
-  (let [r (:radius e)]
-    (f e (:x e) (:y e))
-    (when (< (- (:x e) r)   0)     (f e (+ (:x e) 600)    (:y e)))
-    (when (> (+ (:x e) r) 600)     (f e (- (:x e) 600)    (:y e)))
-    (when (< (- (:y e) r)   0)     (f e    (:x e)      (+ (:y e) 500)))
-    (when (> (+ (:y e) r) 500)     (f e    (:x e)      (- (:y e) 500)))))
+(defn draw-using [f e]
+  (let [x (:x e)
+        y (:y e)
+        r (:radius e)]
+    (f e x y)
+    (when (< (- x r)      0)     (f e (+ x WIDTH)    y))
+    (when (> (+ x r)  WIDTH)     (f e (- x WIDTH)    y))
+    (when (< (- y r)      0)     (f e    x      (+ y HEIGHT)))
+    (when (> (+ y r) HEIGHT)     (f e    x      (- y HEIGHT)))))
 
 (defn draw-entity [e]
   (if (:image e)
-    (draw-with draw-image-at e)
-    (draw-with draw-asteroid-at e)))
+    (draw-using draw-image-at e)
+    (draw-using draw-asteroid-at e)))
+
+(defn draw-hud [player]
+  (text (str (int (:health player)) "% health") 20 20)
+  (text (str (int (current-frame-rate)) " fps") (- WIDTH 60) 20))
 
 
 ;; quil
@@ -249,25 +263,26 @@
   (preload-image "bullet.png")
   (smooth)
   (stroke-weight 0)
-  (frame-rate 30)
+  (frame-rate 60)
   (background 8 8 32))
 
 (defn draw []
+  (swap! game-atom update-game)
   (background 8 8 32)
   (doseq [[k e] @game-atom]
     (draw-entity e))
-  (text (str (Math/floor (:health (:player @game-atom))) "% health") 20 20)
-  (swap! game-atom update-game)
+  (draw-hud (:player @game-atom))
   (reset! previous-time-atom (millis)))
 
-
-(defn -main [& args]
+(defn open-window []
   (defsketch example
     :title "Asteroids"
     :setup setup
     :draw draw
-    :size [600 500]
+    :size [WIDTH HEIGHT]
     :key-pressed key-pressed
     :key-released key-released))
 
-; (-main)
+
+(defn -main [& args]
+  (open-window))
