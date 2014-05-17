@@ -4,9 +4,16 @@
 
 
 
-(defn fmap [f m]
+(defn map-values [f m]
   (into {} (for [[k v] m] [k (f v)])))
 
+(defn filter-values [f m]
+  (into {} (filter (comp f val) m)))
+
+(defn safe-update-in [m p f]
+  (if (= m (update-in m p identity))
+    (update-in m p f)
+    m))
 
 
 (defonce preloaded-images-atom (atom {}))
@@ -33,12 +40,18 @@
       (assoc :thrust 0)
       (assoc :image "bullet.png")
       (assoc :w 8)
-      (assoc :h 8)))
+      (assoc :h 8)
+      (assoc :ttl 5000)))
 
 
+
+
+(def previous-time-atom (atom 0))
+
+(defn elapsed-time []
+  (- (millis) @previous-time-atom))
 
 (def game-atom (atom { :player (new-player)}))
-
 
 
 (defn wrap-around [v min max]
@@ -53,8 +66,13 @@
       (update-in [:vy] #(+ % (* (:thrust entity) (Math/sin (:angle entity)))))
       (update-in [:x] #(wrap-around (+ % (:vx entity)) 0 (width)))
       (update-in [:y] #(wrap-around (+ % (:vy entity)) 0 (height)))
-      (update-in [:angle] #(+ % (:va entity)))))
+      (update-in [:angle] #(+ % (:va entity)))
+      (safe-update-in [:ttl] #(- % (elapsed-time)))))
 
+(defn update-game [game]
+  (->> game
+       (map-values update-entity)
+       (filter-values #(or (nil? (:ttl %)) (< 0 (:ttl %))))))
 
 
 (defn setup []
@@ -66,12 +84,13 @@
 
 (defn draw []
   (background 8 8 32)
-  (swap! game-atom #(fmap update-entity %))
+  (swap! game-atom update-game)
   (doseq [[k obj] @game-atom]
     (with-translation [(:x obj) (:y obj)]
       (with-rotation [(:angle obj)]
         (with-translation [(- (/ (:w obj) 2)) (- (/ (:h obj) 2))]
-          (image (get-image (:image obj)) 0 0 (:w obj) (:h obj)))))))
+          (image (get-image (:image obj)) 0 0 (:w obj) (:h obj))))))
+  (reset! previous-time-atom (millis)))
 
 (defn translate-key [k]
   (get { :a :left :d :right :w :up :l :fire } k k))
