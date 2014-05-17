@@ -21,6 +21,7 @@
 
 (def game-atom (atom { :player { :x 200 :y 100
                                  :vx 0.0 :vy 0.0 :va 0.0
+                                 :w 32 :h 32
                                  :image "player.png"
                                  :angle (/ Math/PI 4) }}))
 
@@ -47,7 +48,8 @@
   (doseq [[k obj] @game-atom]
     (with-translation [(:x obj) (:y obj)]
       (with-rotation [(:angle obj)]
-        (image (get-image (:image obj)) 0 0 32 32)))))
+        (with-translation [(- (/ (:w obj) 2)) (- (/ (:h obj) 2))]
+          (image (get-image (:image obj)) 0 0 (:w obj) (:h obj)))))))
 
 (defn key-pressed []
   (case (key-as-keyword)
