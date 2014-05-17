@@ -27,14 +27,19 @@
 
 
 
+(defn wrap-around [v min max]
+  (cond
+   (< v min)  (+ v max)
+   (> v max)  (- v max)
+   :else      v))
+
 (defn update-entity [entity]
   (-> entity
       (update-in [:vx] #(+ % (* (:thrust entity) (Math/cos (:angle entity)))))
       (update-in [:vy] #(+ % (* (:thrust entity) (Math/sin (:angle entity)))))
-      (update-in [:x] #(+ % (:vx entity)))
-      (update-in [:y] #(+ % (:vy entity)))
+      (update-in [:x] #(wrap-around (+ % (:vx entity)) 0 600))
+      (update-in [:y] #(wrap-around (+ % (:vy entity)) 0 500))
       (update-in [:angle] #(+ % (:va entity)))))
-
 
 
 
