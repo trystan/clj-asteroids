@@ -19,11 +19,25 @@
 
 
 
-(def game-atom (atom { :player { :x 200 :y 100
-                                 :vx 0.0 :vy 0.0 :va 0.0 :thrust 0
-                                 :w 32 :h 32
-                                 :image "player.png"
-                                 :angle (/ Math/PI 4) }}))
+(defn new-player []
+  { :image "player.png"
+    :w 32 :h 32
+    :x 200 :y 100 :angle (/ Math/PI 4)
+    :vx 0.0 :vy 0.0 :va 0.0 :thrust 0 })
+
+(defn new-bullet [source]
+  (-> source
+      (assoc :vx (+ (:vx source) (* 5 (Math/cos (:angle source)))))
+      (assoc :vy (+ (:vy source) (* 5 (Math/sin (:angle source)))))
+      (assoc :va 0)
+      (assoc :thrust 0)
+      (assoc :image "bullet.png")
+      (assoc :w 8)
+      (assoc :h 8)))
+
+
+
+(def game-atom (atom { :player (new-player)}))
 
 
 
@@ -37,14 +51,15 @@
   (-> entity
       (update-in [:vx] #(+ % (* (:thrust entity) (Math/cos (:angle entity)))))
       (update-in [:vy] #(+ % (* (:thrust entity) (Math/sin (:angle entity)))))
-      (update-in [:x] #(wrap-around (+ % (:vx entity)) 0 600))
-      (update-in [:y] #(wrap-around (+ % (:vy entity)) 0 500))
+      (update-in [:x] #(wrap-around (+ % (:vx entity)) 0 (width)))
+      (update-in [:y] #(wrap-around (+ % (:vy entity)) 0 (height)))
       (update-in [:angle] #(+ % (:va entity)))))
 
 
 
 (defn setup []
   (preload-image "player.png")
+  (preload-image "bullet.png")
   (smooth)
   (frame-rate 30)
   (background 8 8 32))
@@ -59,13 +74,14 @@
           (image (get-image (:image obj)) 0 0 (:w obj) (:h obj)))))))
 
 (defn translate-key [k]
-  (get { :a :left :d :right :w :up } k k))
+  (get { :a :left :d :right :w :up :l :fire } k k))
 
 (defn key-pressed []
   (case (translate-key (key-as-keyword))
     :left  (swap! game-atom (fn [game] (update-in game [:player :va] #(- % 0.1))))
     :right (swap! game-atom (fn [game] (update-in game [:player :va] #(+ % 0.1))))
     :up    (swap! game-atom (fn [game] (update-in game [:player :thrust] #(+ % 0.1))))
+    :fire  (swap! game-atom (fn [game] (assoc-in  game [(count game)] (new-bullet (:player game)))))
            (println "Unexpected key press" (key-as-keyword))))
 
 (defn key-released []
