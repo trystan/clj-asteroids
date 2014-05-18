@@ -317,7 +317,6 @@
   (text "press enter to play" (/ WIDTH 2) (* HEIGHT 0.66)))
 
 (defn key-pressed-start-screen []
-  (println (get-key))
   (when (= :enter (get-key))
     (enter-screen play-screen)))
 
