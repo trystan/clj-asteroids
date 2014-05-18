@@ -47,7 +47,14 @@
 
 (def game-atom (atom {}))
 
-(def ui-atom (atom {}))
+(def ui-atom (atom { :paused? false }))
+
+(def screen-atom (atom {} ))
+
+(defn enter-screen [screen]
+  (when (:setup screen)
+    ((:setup screen)))
+  (reset! screen-atom screen))
 
 
 ;; entity constructors
@@ -209,31 +216,11 @@
 
 
 ;; user input
-(defn translate-key [k]
-  (get { :a :left :d :right :w :up :space :fire :enter :fire } k k))
-
 (defn get-key []
-  (translate-key
-   (case (key-code)
-     10       :enter
-     32       :space
-              (key-as-keyword))))
-
-(defn key-pressed []
-  (case (get-key)
-    :left  (swap! game-atom (fn [game] (assoc-in  game [:player :va] -0.05)))
-    :right (swap! game-atom (fn [game] (assoc-in  game [:player :va]  0.05)))
-    :up    (swap! game-atom (fn [game] (assoc-in  game [:player :thrust] 0.1)))
-    :fire  (swap! game-atom (fn [game] (update-in game [:player :children] #(conj % (new-bullet (:player game))))))
-    :p     (swap! ui-atom (fn [ui] (update-in ui [:paused?] #(if % false true))))
-           nil))
-
-(defn key-released []
-  (case (get-key)
-    :left  (swap! game-atom (fn [game] (assoc-in game [:player :va] 0)))
-    :right (swap! game-atom (fn [game] (assoc-in game [:player :va] 0)))
-    :up    (swap! game-atom (fn [game] (assoc-in game [:player :thrust] 0)))
-           nil))
+  (case (key-code)
+    10       :enter
+    32       :space
+    (key-as-keyword)))
 
 
 ;; drawing
@@ -278,6 +265,66 @@
     (text "PAUSED" (/ WIDTH 2) (/ HEIGHT 2))))
 
 
+
+;; ---- play screen ----
+(defn setup-play-screen []
+  (reset! game-atom (new-game)))
+
+(defn update-play-screen []
+  (if (:paused? @ui-atom)
+    nil
+    (swap! game-atom update-game))
+  (when (= nil (:player @game-atom))
+    (reset! game-atom (new-game)))
+  (reset! previous-time-atom (millis)))
+
+(defn draw-play-screen []
+  (let [game @game-atom]
+    (background 8 8 32)
+    (doseq [[k e] game]
+      (draw-entity e))
+    (draw-hud (:player game))))
+
+(defn translate-key [k]
+  (get { :a :left :d :right :w :up :space :fire :enter :fire } k k))
+
+(defn key-pressed-play-screen []
+  (case (translate-key (get-key))
+    :left  (swap! game-atom (fn [game] (assoc-in  game [:player :va] -0.05)))
+    :right (swap! game-atom (fn [game] (assoc-in  game [:player :va]  0.05)))
+    :up    (swap! game-atom (fn [game] (assoc-in  game [:player :thrust] 0.1)))
+    :fire  (swap! game-atom (fn [game] (update-in game [:player :children] #(conj % (new-bullet (:player game))))))
+    :p     (swap! ui-atom (fn [ui] (update-in ui [:paused?] #(if % false true))))
+           nil))
+
+(defn key-released-play-screen []
+  (case (translate-key (get-key))
+    :left  (swap! game-atom (fn [game] (assoc-in game [:player :va] 0)))
+    :right (swap! game-atom (fn [game] (assoc-in game [:player :va] 0)))
+    :up    (swap! game-atom (fn [game] (assoc-in game [:player :thrust] 0)))
+           nil))
+
+(def play-screen { :setup setup-play-screen
+                   :update update-play-screen
+                   :draw draw-play-screen
+                   :key-pressed key-pressed-play-screen
+                   :key-released key-released-play-screen })
+
+
+;; ---- start screen ----
+(defn draw-start-screen []
+  (text "clj-asteroids" (/ WIDTH 2) (* HEIGHT 0.33))
+  (text "press enter to play" (/ WIDTH 2) (* HEIGHT 0.66)))
+
+(defn key-pressed-start-screen []
+  (println (get-key))
+  (when (= :enter (get-key))
+    (enter-screen play-screen)))
+
+(def start-screen { :draw draw-start-screen
+                    :key-pressed key-pressed-start-screen })
+
+
 ;; quil
 (defn setup []
   (preload-image "player.png")
@@ -285,30 +332,36 @@
   (smooth)
   (stroke-weight 0)
   (frame-rate 60)
-  (background 8 8 32)
-  (reset! game-atom (new-game)))
+  (background 8 8 32))
 
 (defn draw []
-  (if (:paused? @ui-atom)
-    nil
-    (swap! game-atom update-game))
-  (when (= nil (:player @game-atom))
-    (reset! game-atom (new-game)))
-  (background 8 8 32)
-  (doseq [[k e] @game-atom]
-    (draw-entity e))
-  (draw-hud (:player @game-atom))
-  (reset! previous-time-atom (millis)))
+  (let [screen @screen-atom
+        update-fn (:update screen)
+        draw-fn (:draw screen)]
+    (when update-fn
+      (update-fn))
+    (when draw-fn
+      (draw-fn))))
+
+(defn key-pressed []
+  (let [screen @screen-atom]
+    (when (:key-pressed screen)
+      ((:key-pressed screen)))))
+
+(defn key-released []
+  (let [screen @screen-atom]
+    (when (:key-released screen)
+      ((:key-released screen)))))
 
 (defn open-window []
   (defsketch example
     :title "Asteroids"
+    :size [WIDTH HEIGHT]
     :setup setup
     :draw draw
-    :size [WIDTH HEIGHT]
     :key-pressed key-pressed
     :key-released key-released))
 
-
 (defn -main [& args]
+  (enter-screen start-screen)
   (open-window))
