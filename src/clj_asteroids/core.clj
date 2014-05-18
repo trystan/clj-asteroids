@@ -124,25 +124,25 @@
 (defmulti collide
   (fn [a b] [(:entity-type a) (:entity-type b)]))
 
-(defmethod collide [:asteroid :bullet] [a b]
-  (if (> 5 (:radius a))
-    (assoc a :ttl -1)
-    (-> a
+(defmethod collide [:asteroid :bullet] [asteroid bullet]
+  (if (> 5 (:radius asteroid))
+    (assoc asteroid :ttl -1)
+    (-> asteroid
         (assoc :ttl -1)
-        (update-in [:children] #(conj % (new-asteroid-from a)))
-        (update-in [:children] #(conj % (new-asteroid-from a))))))
+        (update-in [:children] #(conj % (new-asteroid-from asteroid)))
+        (update-in [:children] #(conj % (new-asteroid-from asteroid))))))
 
-(defmethod collide [:bullet :asteroid] [a b]
-  (assoc a :ttl -1))
+(defmethod collide [:bullet :asteroid] [bullet asteroid]
+  (assoc bullet :ttl -1))
 
-(defmethod collide [:ship :asteroid] [a b]
-  (-> a
-      (update-in [:vx] #(+ % (* 0.1 (:vx b)) (* 0.02 (- (:x a) (:x b)))))
-      (update-in [:vy] #(+ % (* 0.1 (:vy b)) (* 0.02 (- (:y a) (:y b)))))
-      (update-in [:health] #(- % (* (:radius b) 0.1)))))
+(defmethod collide [:ship :asteroid] [ship asteroid]
+  (-> ship
+      (update-in [:vx] #(+ % (* 0.2 (:vx asteroid)) (* 0.02 (- (:x ship) (:x asteroid)))))
+      (update-in [:vy] #(+ % (* 0.2 (:vy asteroid)) (* 0.02 (- (:y ship) (:y asteroid)))))
+      (update-in [:health] #(- % (* (:radius asteroid) 0.1)))))
 
-(defmethod collide :default [a b]
-  a)
+(defmethod collide :default [this other]
+  this)
 
 (defn do-collisions-on [e game]
   (let [[_ other] (first game)
