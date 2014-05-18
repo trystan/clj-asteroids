@@ -103,6 +103,8 @@
 
 (def game-atom (atom {}))
 
+(def ui-atom (atom {}))
+
 
 ;; collision detection and response
 (defn collides? [a b]
@@ -201,7 +203,6 @@
        (promote-children-to-entities)
        (filter-values is-alive?)))
 
-(open-window)
 
 ;; user input
 (defn translate-key [k]
@@ -220,7 +221,7 @@
     :right (swap! game-atom (fn [game] (assoc-in  game [:player :va]  0.05)))
     :up    (swap! game-atom (fn [game] (assoc-in  game [:player :thrust] 0.1)))
     :fire  (swap! game-atom (fn [game] (update-in game [:player :children] #(conj % (new-bullet (:player game))))))
-    :p     (println @game-atom)
+    :p     (swap! ui-atom (fn [ui] (update-in ui [:paused?] #(if % false true))))
            nil))
 
 (defn key-released []
@@ -268,7 +269,9 @@
 
 (defn draw-hud [player]
   (text (str (int (:health player)) "% health") 20 20)
-  (text (str (int (current-frame-rate)) " fps") (- WIDTH 60) 20))
+  (text (str (int (current-frame-rate)) " fps") (- WIDTH 60) 20)
+  (when (:paused? @ui-atom)
+    (text "PAUSED" (/ WIDTH 2) (/ HEIGHT 2))))
 
 
 ;; quil
@@ -282,7 +285,9 @@
   (reset! game-atom (new-game)))
 
 (defn draw []
-  (swap! game-atom update-game)
+  (if (:paused? @ui-atom)
+    nil
+    (swap! game-atom update-game))
   (background 8 8 32)
   (doseq [[k e] @game-atom]
     (draw-entity e))
