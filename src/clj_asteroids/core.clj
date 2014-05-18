@@ -70,19 +70,19 @@
     :max-speed 3 })
 
 (defn new-bullet [source]
-  (merge source
-         { :entity-type :bullet
-           :children (list)
-           :x (+ (:x source) (* (:radius source) 0.6 (Math/cos (:angle source))))
-           :y (+ (:y source) (* (:radius source) 0.6 (Math/sin (:angle source))))
-           :vx (+ (:vx source) (* 8 (Math/cos (:angle source))))
-           :vy (+ (:vy source) (* 8 (Math/sin (:angle source))))
-           :va 0
-           :thrust 0
-           :image "bullet.png"
-           :radius 8
-           :max-speed 5
-           :ttl 3000 }))
+  { :entity-type :bullet
+    :children (list)
+    :x (+ (:x source) (* (:radius source) 0.6 (Math/cos (:angle source))))
+    :y (+ (:y source) (* (:radius source) 0.6 (Math/sin (:angle source))))
+    :vx (+ (:vx source) (* 8 (Math/cos (:angle source))))
+    :vy (+ (:vy source) (* 8 (Math/sin (:angle source))))
+    :angle (:angle source)
+    :va 0
+    :thrust 0
+    :image "bullet.png"
+    :radius 8
+    :max-speed 5
+    :ttl 3000 })
 
 (defn new-asteroid [radius]
   { :entity-type :asteroid
