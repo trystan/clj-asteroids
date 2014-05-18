@@ -34,6 +34,22 @@
   (get @preloaded-images-atom path))
 
 
+;; global state
+(def previous-time-atom (atom 0))
+
+(defn elapsed-time []
+  (- (millis) @previous-time-atom))
+
+(def next-id-atom (atom 0))
+
+(defn next-id []
+  (swap! next-id-atom inc))
+
+(def game-atom (atom {}))
+
+(def ui-atom (atom {}))
+
+
 ;; entity constructors
 (defn new-player []
   { :entity-type :ship
@@ -88,22 +104,6 @@
                    (assoc (next-id) (new-asteroid 32))
                    (assoc (next-id) (new-asteroid 22))
                    (assoc (next-id) (new-asteroid 12)) ))
-
-
-;; global state
-(def previous-time-atom (atom 0))
-
-(defn elapsed-time []
-  (- (millis) @previous-time-atom))
-
-(def next-id-atom (atom 0))
-
-(defn next-id []
-  (swap! next-id-atom inc))
-
-(def game-atom (atom {}))
-
-(def ui-atom (atom {}))
 
 
 ;; collision detection and response
@@ -193,8 +193,12 @@
         game2 (map-values #(assoc % :children (list)) game)]
     (into game2 (map #(identity [(next-id) %]) children))))
 
+(defn is-dead? [e]
+   (or (and (:ttl e) (< (:ttl e) 1))
+       (and (:health e) (< (:health e) 1))))
+
 (defn is-alive? [e]
-  (or (nil? (:ttl e)) (< 0 (:ttl e))))
+  (not (is-dead? e)))
 
 (defn update-game [game]
   (->> game
@@ -288,6 +292,8 @@
   (if (:paused? @ui-atom)
     nil
     (swap! game-atom update-game))
+  (when (= nil (:player @game-atom))
+    (reset! game-atom (new-game)))
   (background 8 8 32)
   (doseq [[k e] @game-atom]
     (draw-entity e))
