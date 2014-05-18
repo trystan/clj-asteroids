@@ -5,6 +5,7 @@
 (def WIDTH 1024)
 (def HEIGHT 768)
 
+
 ;; utility functions
 (defn map-values
   "map a function over the values of a map"
@@ -324,7 +325,7 @@
                     :key-pressed key-pressed-start-screen })
 
 
-;; quil
+;; quil callbacks that delegate to the current screen
 (defn setup []
   (preload-image "player.png")
   (preload-image "bullet.png")
@@ -343,14 +344,16 @@
       (draw-fn))))
 
 (defn key-pressed []
-  (let [screen @screen-atom]
-    (when (:key-pressed screen)
-      ((:key-pressed screen)))))
+  (let [screen @screen-atom
+        key-pressed-fn (:key-pressed screen)]
+    (when key-pressed-fn
+      (key-pressed-fn))))
 
 (defn key-released []
-  (let [screen @screen-atom]
-    (when (:key-released screen)
-      ((:key-released screen)))))
+  (let [screen @screen-atom
+        key-released-fn (:key-released screen)]
+    (when key-released-fn
+      (key-released-fn))))
 
 (defn open-window []
   (defsketch example
