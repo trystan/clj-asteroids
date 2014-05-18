@@ -6,13 +6,19 @@
 (def HEIGHT 768)
 
 ;; utility functions
-(defn map-values [f m]
+(defn map-values
+  "map a function over the values of a map"
+  [f m]
   (into {} (for [[k v] m] [k (f v)])))
 
-(defn filter-values [f m]
+(defn filter-values
+  "filter a map based on its values"
+  [f m]
   (into {} (filter (comp f val) m)))
 
-(defn safe-update-in [m p f]
+(defn safe-update-in
+  "like update-in, except it counts as the identity function if the path isn't in the map"
+  [m p f]
   (if (= m (update-in m p identity))
     (update-in m p f)
     m))
@@ -35,26 +41,24 @@
     :children (list)
     :image "player.png"
     :radius 32
-    :x 200 :y 100 :angle (/ Math/PI 4)
+    :x (* 0.5 WIDTH) :y (* 0.5 HEIGHT) :angle (rand (* 2 Math/PI))
     :vx 0.0 :vy 0.0 :va 0.0 :thrust 0
     :max-speed 3 })
 
 (defn new-bullet [source]
-  (-> source
-      (assoc :entity-type :bullet)
-      (assoc :children (list))
-      (update-in [:x] #(+ % (* (:radius source) 0.6 (Math/cos (:angle source)))))
-      (update-in [:y] #(+ % (* (:radius source) 0.6 (Math/sin (:angle source)))))
-      (assoc :vx (+ (:vx source) (* 8 (Math/cos (:angle source)))))
-      (assoc :vy (+ (:vy source) (* 8 (Math/sin (:angle source)))))
-      (assoc :va 0)
-      (assoc :thrust 0)
-      (assoc :image "bullet.png")
-      (assoc :radius 8)
-      (assoc :max-speed 5)
-      (assoc :ttl 3000)))
-
-(open-window)
+  (merge source
+         { :entity-type :bullet
+           :children (list)
+           :x (+ (:x source) (* (:radius source) 0.6 (Math/cos (:angle source))))
+           :y (+ (:y source) (* (:radius source) 0.6 (Math/sin (:angle source))))
+           :vx (+ (:vx source) (* 8 (Math/cos (:angle source))))
+           :vy (+ (:vy source) (* 8 (Math/sin (:angle source))))
+           :va 0
+           :thrust 0
+           :image "bullet.png"
+           :radius 8
+           :max-speed 5
+           :ttl 3000 }))
 
 (defn new-asteroid [radius]
   { :entity-type :asteroid
@@ -72,12 +76,18 @@
                 [px py]))})
 
 (defn new-asteroid-from [a]
-  (-> (new-asteroid (* (:radius a) 0.66))
-      (assoc :x (+ (:x a) (rand-int 10) -5))
-      (assoc :y (+ (:y a) (rand-int 10) -5))
-      (assoc :vx (* 1.15 (+ (:vx a) (- (rand-int 6) 3))))
-      (assoc :vy (* 1.15 (+ (:vy a) (- (rand-int 6) 3))))
-      (assoc :va (+ (:va a) (* (- (rand) 0.5) 0.05)))))
+  (merge (new-asteroid (* (:radius a) 0.66))
+         { :x (+ (:x a) (rand-int 10) -5)
+           :y (+ (:y a) (rand-int 10) -5)
+           :vx (* 1.1 (+ (:vx a) (- (rand) 0.5)))
+           :vy (* 1.1 (+ (:vy a) (- (rand) 0.5)))
+           :va (+ (:va a) (* (- (rand) 0.5) 0.05)) }))
+
+(defn new-game [] (-> {}
+                   (assoc :player   (new-player))
+                   (assoc (next-id) (new-asteroid 32))
+                   (assoc (next-id) (new-asteroid 22))
+                   (assoc (next-id) (new-asteroid 12)) ))
 
 
 ;; global state
@@ -91,14 +101,10 @@
 (defn next-id []
   (swap! next-id-atom inc))
 
-(def game-atom (atom (-> {}
-                         (assoc :player (new-player))
-                         (assoc (next-id) (new-asteroid 32))
-                         (assoc (next-id) (new-asteroid 22))
-                         (assoc (next-id) (new-asteroid 12)))))
+(def game-atom (atom {}))
 
 
-;; collision detection and collision update
+;; collision detection and response
 (defn collides? [a b]
   (let [dx (- (:x a) (:x b))
         dy (- (:y a) (:y b))
@@ -121,8 +127,8 @@
 
 (defmethod collide [:ship :asteroid] [a b]
   (-> a
-      (update-in [:vx] #(+ % (* 0.025 (- (:x a) (:x b)))))
-      (update-in [:vy] #(+ % (* 0.025 (- (:y a) (:y b)))))
+      (update-in [:vx] #(+ % (* 0.1 (:vx b)) (* 0.02 (- (:x a) (:x b)))))
+      (update-in [:vy] #(+ % (* 0.1 (:vy b)) (* 0.02 (- (:y a) (:y b)))))
       (update-in [:health] #(- % (* (:radius b) 0.1)))))
 
 (defmethod collide :default [a b]
@@ -180,7 +186,7 @@
       (apply-velocity)
       (apply-ttl)))
 
-(defn add-children [game]
+(defn promote-children-to-entities [game]
   (let [children (mapcat #(:children (val %)) game)
         game2 (map-values #(assoc % :children (list)) game)]
     (into game2 (map #(identity [(next-id) %]) children))))
@@ -192,16 +198,24 @@
   (->> game
        (do-collisions)
        (map-values update-entity)
-       (add-children)
+       (promote-children-to-entities)
        (filter-values is-alive?)))
 
+(open-window)
 
 ;; user input
 (defn translate-key [k]
-  (get { :a :left :d :right :w :up :l :fire :f :fire } k k))
+  (get { :a :left :d :right :w :up :space :fire :enter :fire } k k))
+
+(defn get-key []
+  (translate-key
+   (case (key-code)
+     10       :enter
+     32       :space
+              (key-as-keyword))))
 
 (defn key-pressed []
-  (case (translate-key (key-as-keyword))
+  (case (get-key)
     :left  (swap! game-atom (fn [game] (assoc-in  game [:player :va] -0.05)))
     :right (swap! game-atom (fn [game] (assoc-in  game [:player :va]  0.05)))
     :up    (swap! game-atom (fn [game] (assoc-in  game [:player :thrust] 0.1)))
@@ -210,7 +224,7 @@
            nil))
 
 (defn key-released []
-  (case (translate-key (key-as-keyword))
+  (case (get-key)
     :left  (swap! game-atom (fn [game] (assoc-in game [:player :va] 0)))
     :right (swap! game-atom (fn [game] (assoc-in game [:player :va] 0)))
     :up    (swap! game-atom (fn [game] (assoc-in game [:player :thrust] 0)))
@@ -264,7 +278,8 @@
   (smooth)
   (stroke-weight 0)
   (frame-rate 60)
-  (background 8 8 32))
+  (background 8 8 32)
+  (reset! game-atom (new-game)))
 
 (defn draw []
   (swap! game-atom update-game)

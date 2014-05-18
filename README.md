@@ -10,4 +10,4 @@ It's asteroids. In clojure.
 
     $ java -jar clj-asteroids-0.1.0-standalone.jar
 
-[w][a][d] or arrow keys to turn. [f] or [l] to fire.
+[w][a][d] or arrow keys to turn. [space] or [enter] to fire.
