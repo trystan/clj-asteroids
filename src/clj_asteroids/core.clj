@@ -88,13 +88,14 @@
   { :entity-type :asteroid
     :children (list)
     :radius radius
+    :color [(+ (rand-int 10) 110) (+ (rand-int 10) 80) (+ (rand-int 10) 70)]
     :x (rand-int WIDTH) :y (rand-int HEIGHT) :angle (* (rand) Math/PI 2)
     :vx (- (* 6 (rand)) 3) :vy (- (* 6 (rand)) 3) :va (* (- (rand) 0.5) 0.1)
     :max-speed 3.5
     :points (for [angle (range 10)]
               (let [angle (+ angle (* (rand) -0.5) 0.1)
                     radians (* Math/PI 2 (/ angle 10.0))
-                    r (+ radius (rand-int 10) 5)
+                    r (+ radius (rand-int 5))
                     px (* r (Math/cos radians))
                     py (* r (Math/sin radians))]
                 [px py]))})
@@ -226,8 +227,8 @@
 
 ;; drawing
 (defn draw-asteroid-at [e x y]
-  (with-fill [200 150 140]
-    (with-stroke [0]
+  (with-fill (:color e)
+    (with-stroke (:color e)
       (with-translation [x y]
         (with-rotation [(:angle e)]
           (begin-shape :triangle-fan)
@@ -236,7 +237,19 @@
               (vertex x y))
           (let [[x y] (first (:points e))]
               (vertex x y))
-          (end-shape))))))
+          (end-shape)))))
+  (with-stroke (mapv #(* % 0.5) (:color e))
+    (with-translation [x y]
+      (with-rotation [(:angle e)]
+        (begin-shape :lines)
+        (let [[x y] (last (:points e))]
+          (vertex x y))
+        (doseq [[x y] (:points e)]
+          (vertex x y)
+          (vertex x y))
+        (let [[x y] (first (:points e))]
+          (vertex x y))
+        (end-shape)))))
 
 (defn draw-image-at [e x y]
   (with-translation [x y]
@@ -260,9 +273,11 @@
     (draw-using draw-asteroid-at e)))
 
 (defn draw-hud [player]
+  (text-align :left :center)
   (text (str (int (:health player)) "% health") 20 20)
   (text (str (int (current-frame-rate)) " fps") (- WIDTH 60) 20)
   (when (:paused? @ui-atom)
+    (text-align :center :center)
     (text "PAUSED" (/ WIDTH 2) (/ HEIGHT 2))))
 
 
@@ -314,6 +329,7 @@
 
 ;; ---- start screen ----
 (defn draw-start-screen []
+  (text-align :center :center)
   (text "clj-asteroids" (/ WIDTH 2) (* HEIGHT 0.33))
   (text "press enter to play" (/ WIDTH 2) (* HEIGHT 0.66)))
 
@@ -330,7 +346,7 @@
   (preload-image "player.png")
   (preload-image "bullet.png")
   (smooth)
-  (stroke-weight 0)
+  (stroke-weight 1)
   (frame-rate 60)
   (background 8 8 32))
 
