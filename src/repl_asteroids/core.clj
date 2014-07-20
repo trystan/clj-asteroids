@@ -30,10 +30,10 @@
 (defn main []
   (defsketch demo
     :title "Asteroids"
+    :size [window-width window-height]
     :setup setup
     :update update
     :draw draw
     :key-pressed key-pressed
     :key-released key-released
-    :size [window-width window-height]
     :middleware [fun-mode]))
