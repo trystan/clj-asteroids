@@ -27,7 +27,8 @@
       :y front-y :vy (+ (:vy ship) (* 10 (Math/sin (:angle ship))))
       :angle (:angle ship) :vangle 0
       :image "shot.png" :width 8    :height 8
-      :max-speed 10}))
+      :max-speed 10
+      :ttl 50 }))
 
 
 (def game-state-atom (atom { :ship (new-ship)
@@ -74,17 +75,32 @@
   (assoc thing :x (wrap (:x thing) window-width)
                :y (wrap (:y thing) window-height)))
 
+(defn update-ttl [thing]
+  (if (:ttl thing)
+    (update-in thing [:ttl] dec)
+    thing))
+
 (defn update-thing [thing]
   (-> thing
       (clamp-values)
       (forward)
       (inertia)
-      (wrap-around)))
+      (wrap-around)
+      (update-ttl)))
+
+(defn is-dead [thing]
+  (or (nil? (:ttl thing)) (< 0 (:ttl thing))))
+
+(defn remove-dead [things]
+  (filter is-dead things))
+
+(defn update-things [things]
+  (remove-dead (map update-thing things)))
 
 (defn update [state]
   (-> state
-    (update-in [:asteroids] (fn [as] (map update-thing as)))
-    (update-in [:bullets] (fn [bs] (map update-thing bs)))
+    (update-in [:asteroids] update-things)
+    (update-in [:bullets] update-things)
     (update-in [:ship] update-thing)))
 
 
