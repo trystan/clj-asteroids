@@ -6,7 +6,8 @@
 (def window-height 500)
 
 (defn new-ship []
-  { :x (/ window-width 2)  :vx 0
+  { :type :ship
+    :x (/ window-width 2)  :vx 0
     :y (/ window-height 2) :vy 0
     :angle 0               :vangle 0
     :image "ship.png"    :width 49    :height 16
@@ -14,7 +15,8 @@
     :max-speed 5})
 
 (defn new-asteroid []
-  { :x (rand-int window-width)  :vx (- (rand) 0.5)
+  { :type :asteroid
+    :x (rand-int window-width)  :vx (- (rand) 0.5)
     :y (rand-int window-height) :vy (- (rand) 0.5)
     :angle (rand (* 2 Math/PI)) :vangle (* (- (rand) 0.5) 0.2)
     :image "asteroid.png" :width 64    :height 64
@@ -23,7 +25,8 @@
 (defn new-bullet [ship]
   (let [front-x (+ (:x ship) (* 8 (Math/cos (:angle ship))))
         front-y (+ (:y ship) (* 8 (Math/sin (:angle ship))))]
-    { :x front-x :vx (+ (:vx ship) (* 10 (Math/cos (:angle ship))))
+    { :type :bullet
+      :x front-x :vx (+ (:vx ship) (* 10 (Math/cos (:angle ship))))
       :y front-y :vy (+ (:vy ship) (* 10 (Math/sin (:angle ship))))
       :angle (:angle ship) :vangle 0
       :image "shot.png" :width 8    :height 8
@@ -40,6 +43,35 @@
   (frame-rate 30)
   (image-mode :center))
 
+
+;; collisions
+(defn collides? [a b]
+  (let [dx (- (:x a) (:x b))
+        dy (- (:y a) (:y b))
+        distance-squared (+ (* dx dx) (* dy dy))
+        radius-squared (* (:height a) (:height b))]
+    (< distance-squared radius-squared )))
+
+(defmulti collide (fn [a b] [(:type a) (:type b)]))
+
+(defmethod collide [:bullet :asteroid] [bullet asteroid]
+  (assoc bullet :ttl -1))
+
+(defmethod collide :default [a b]
+  a)
+
+(defn collide-two [a b]
+  (if (collides? a b)
+    (collide a b)
+    a))
+
+(defn collide-one-vs-group [a bs]
+  (if (empty? bs)
+    a
+    (recur (collide-two a (first bs)) (rest bs))))
+
+(defn collide-groups [as bs]
+  (map (fn [a] (collide-one-vs-group a bs)) as))
 
 
 ;; updating
@@ -101,7 +133,8 @@
   (-> state
     (update-in [:asteroids] update-things)
     (update-in [:bullets] update-things)
-    (update-in [:ship] update-thing)))
+    (update-in [:ship] update-thing)
+    (update-in [:bullets] (fn [bs] (collide-groups bs (:asteroids state))))))
 
 
 ;;drawing
