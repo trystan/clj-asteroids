@@ -8,15 +8,26 @@
 (defn new-ship []
   { :x (/ window-width 2)  :vx 0
     :y (/ window-height 2) :vy 0
-    :angle 0               :vangle 0.1
+    :angle 0               :vangle 0
     :image "ship.png"    :width 49    :height 16
-    :thrust 1})
+    :thrust 0
+    :max-speed 5})
 
 (defn new-asteroid []
   { :x (rand-int window-width)  :vx (- (rand) 0.5)
     :y (rand-int window-height) :vy (- (rand) 0.5)
     :angle (rand (* 2 Math/PI)) :vangle (* (- (rand) 0.5) 0.2)
-    :image "asteroid.png" :width 64    :height 64 })
+    :image "asteroid.png" :width 64    :height 64
+    :max-speed 5})
+
+(defn new-bullet [ship]
+  (let [front-x (+ (:x ship) (* 8 (Math/cos (:angle ship))))
+        front-y (+ (:y ship) (* 8 (Math/sin (:angle ship))))]
+    { :x front-x :vx (+ (:vx ship) (* 10 (Math/cos (:angle ship))))
+      :y front-y :vy (+ (:vy ship) (* 10 (Math/sin (:angle ship))))
+      :angle (:angle ship) :vangle 0
+      :image "shot.png" :width 8    :height 8
+      :max-speed 10}))
 
 
 (def game-state-atom (atom { :ship (new-ship)
@@ -38,8 +49,8 @@
    :else        x))
 
 (defn clamp-values [thing]
-  (assoc thing :vx (clamp (:vx thing) -5 5)
-               :vy (clamp (:vy thing) -5 5)
+  (assoc thing :vx (clamp (:vx thing) (- 0 (:max-speed thing)) (:max-speed thing))
+               :vy (clamp (:vy thing) (- 0 (:max-speed thing)) (:max-speed thing))
                :vangle (clamp (:vangle thing) -1 1)))
 
 (defn forward [thing]
@@ -94,12 +105,30 @@
 
 
 
-;; gui
+;; controlls
+(defn assoc-in-ship [k v]
+  (swap! game-state-atom (fn [state]
+                           (assoc-in state [:ship k] v))))
+
+(defn add-bullet []
+  (swap! game-state-atom (fn [state]
+                           (assoc state :bullets (conj (:bullets state) (new-bullet (:ship state)))))))
+
+
 (defn key-pressed []
-  nil)
+  (case (key-as-keyword)
+        :left    (assoc-in-ship :vangle -0.1)
+        :right   (assoc-in-ship :vangle  0.1)
+        :up      (assoc-in-ship :thrust  0.25)
+        :f       (add-bullet)
+        nil))
 
 (defn key-released []
-  nil)
+  (case (key-as-keyword)
+        :left    (assoc-in-ship :vangle  0)
+        :right   (assoc-in-ship :vangle  0)
+        :up      (assoc-in-ship :thrust  0)
+        nil))
 
 (defn main []
   (defsketch demo
