@@ -9,6 +9,6 @@
   (swap! preloaded-images-atom #(assoc % path (load-image path))))
 
 (defn get-image [path]
-  (when (nil? (get path @preloaded-images-atom))
+  (when (nil? (get @preloaded-images-atom path))
     (preload-image path))
   (get @preloaded-images-atom path))

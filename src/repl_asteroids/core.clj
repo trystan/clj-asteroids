@@ -77,13 +77,14 @@
         radius-squared (* (:height a) (:height b))]
     (< distance-squared radius-squared)))
 
+
 (defmulti collide (fn [a b] [(:type a) (:type b)]))
 
 (defmethod collide [:bullet :asteroid] [bullet asteroid]
   (assoc bullet :ttl -1))
 
 (defmethod collide [:asteroid :bullet] [asteroid bullet]
-  (if (< (:width asteroid) 8)
+  (if (< (:width asteroid) 16)
     (assoc asteroid :ttl -1)
     (assoc asteroid :ttl -1
                     :children [(new-asteroid asteroid) (new-asteroid asteroid)])))
@@ -148,6 +149,14 @@
       (wrap-around)
       (update-ttl)))
 
+;; or for those who like nesting...
+;(defn update-thing [thing things]
+;  (update-ttl (wrap-around (move (forward (clamp-values (collide-with thing things)))))))
+
+;; or for those who like point-free style...
+;(def update-thing
+;  (comp update-ttl wrap-around move forward clamp-values collide-with))
+
 (defn alive? [thing]
   (or (nil? (:ttl thing)) (< 0 (:ttl thing))))
 
@@ -187,8 +196,9 @@
 ;; also ugly....
 (defn add-bullet []
   (swap! game-state-atom (fn [state]
-                           (let [ship (first (filter (fn [thing] (= :ship (:type thing))) state))]
-                             (conj state (new-bullet ship))))))
+                           (if-let [ship (first (filter (fn [thing] (= :ship (:type thing))) state))]
+                             (conj state (new-bullet ship))
+                             state))))
 
 
 

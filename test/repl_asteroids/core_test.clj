@@ -3,6 +3,17 @@
             [repl-asteroids.core :refer :all]))
 
 
+(testing "alive?, ttl > 0"
+  (is (alive? { :ttl 1 })))
+
+(testing "alive?, ttl <= 0"
+  (is (not (alive? { :ttl 0 }))))
+
+(testing "alive?, no ttl"
+  (is (alive? { :ttlmnop 0 })))
+
+
+
 (testing "promote-children, empty"
   (is (= (promote-children ())
          ())))
