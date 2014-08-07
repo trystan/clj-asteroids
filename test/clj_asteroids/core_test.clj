@@ -1,6 +1,6 @@
-(ns repl-asteroids.core-test
+(ns clj-asteroids.core-test
   (:require [clojure.test :refer :all]
-            [repl-asteroids.core :refer :all]))
+            [clj-asteroids.core :refer :all]))
 
 
 (testing "alive?, ttl > 0"

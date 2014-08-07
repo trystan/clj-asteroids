@@ -1,6 +1,6 @@
-(ns repl-asteroids.core
+(ns clj-asteroids.core
   (:require [quil.core :refer :all]
-            [repl-asteroids.quil-helpers :refer :all]))
+            [clj-asteroids.quil-helpers :refer :all]))
 
 (def window-width 800)
 

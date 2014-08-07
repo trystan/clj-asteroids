@@ -1,6 +1,6 @@
-# repl-asteroids
+# clj-asteroids
 
-A Clojure library designed to ... well, that part is up to you.
+Asteroids, in clojure, made mostly in the REPL.
 
 ## Usage
 

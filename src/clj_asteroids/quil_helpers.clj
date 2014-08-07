@@ -1,4 +1,4 @@
-(ns repl-asteroids.quil-helpers
+(ns clj-asteroids.quil-helpers
   (:require [quil.core :refer :all]))
 
 
